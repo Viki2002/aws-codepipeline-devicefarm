@@ -13,30 +13,25 @@ phases:
       - set -e
       - echo "=== Installing Gradle 7.6.1 ==="
       - |
-        for a in 1 2 3; do
-          curl -fsSL --retry 3 --retry-delay 5 \
-            https://services.gradle.org/distributions/gradle-7.6.1-bin.zip \
-            -o gradle.zip && break
-          echo "Gradle download retry $a failed – retrying…"
-        done
-      - file gradle.zip | grep -q 'Zip archive data' || { echo "❌ Gradle ZIP corrupt"; exit 1; }
-      - unzip -q gradle.zip
-      - export PATH="$PWD/gradle-7.6.1/bin:$PATH"
-      - gradle --version
+        curl -fsSL https://services.gradle.org/distributions/gradle-7.6.1-bin.zip -o gradle.zip
+        unzip -q gradle.zip
+        export PATH="$PWD/gradle-7.6.1/bin:$PATH"
+        gradle --version
 
       - echo "=== Installing Android SDK CLI tools ==="
       - export ANDROID_SDK_ROOT="$HOME/android-sdk"
       - mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-      - curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-6609375_latest.zip -o cmdline-tools.zip
-      - unzip -q cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools/tmp"
-      - mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-      - mv "$ANDROID_SDK_ROOT/cmdline-tools/tmp"/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/"
-      - rm -rf "$ANDROID_SDK_ROOT/cmdline-tools/tmp"
+      - curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdline-tools.zip
+      - unzip -q cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
+      - mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
       - export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+      - chmod +x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
       - sdkmanager --version || { echo "❌ sdkmanager missing"; exit 1; }
+
+      - echo "=== Accepting licenses and installing SDK packages ==="
       - yes | sdkmanager --licenses >/dev/null
       - sdkmanager "platform-tools" "platforms;android-29" "build-tools;33.0.2"
-      - echo "=== Android SDK ready ==="
+
       - chmod +x ./gradlew
 
   pre_build:
