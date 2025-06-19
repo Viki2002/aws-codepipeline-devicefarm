@@ -35,12 +35,12 @@ phases:
   pre_build:
     commands:
       - echo "=== Gradle clean ==="
-      - ./gradlew clean --stacktrace --info
+      - ./gradlew clean --stacktrace --info --warning-mode=all || { echo "❌ Gradle clean failed"; exit 1; }
 
   build:
     commands:
       - echo "=== Gradle build ==="
-      - ./gradlew assembleDebug assembleAndroidTest --stacktrace --info
+      - ./gradlew assembleDebug assembleAndroidTest --stacktrace --info --warning-mode=all || { echo "❌ Gradle build failed"; exit 1; }
 
   post_build:
     commands:
