@@ -5,22 +5,32 @@ phases:
     runtime-versions:
       java: corretto11
     commands:
-      - echo "Installing dependencies"
+      - echo "=== Installing Android SDK and tools ==="
+      - export ANDROID_SDK_ROOT=$HOME/android-sdk
+      - mkdir -p $ANDROID_SDK_ROOT
+      - curl -s https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -o cmdline-tools.zip
+      - unzip -q cmdline-tools.zip -d $ANDROID_SDK_ROOT
+      - mkdir -p $ANDROID_SDK_ROOT/cmdline-tools/latest
+      - mv $ANDROID_SDK_ROOT/cmdline-tools/* $ANDROID_SDK_ROOT/cmdline-tools/latest/
+      - export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
+      - yes | sdkmanager --licenses
+      - sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+      - echo "=== Android SDK setup complete ==="
       - chmod +x ./gradlew
 
   pre_build:
     commands:
-      - echo "Cleaning project"
+      - echo "=== Cleaning project ==="
       - ./gradlew clean --stacktrace --info
 
   build:
     commands:
-      - echo "Building APK"
-      - ./gradlew assembleDebug --stacktrace --info
+      - echo "=== Building APK and test APK ==="
+      - ./gradlew assembleDebug assembleAndroidTest --stacktrace --info
 
   post_build:
     commands:
-      - echo "Listing generated APK"
+      - echo "=== Listing generated APKs ==="
       - find app/build/outputs -name "*.apk"
 
 artifacts:
