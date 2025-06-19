@@ -3,14 +3,14 @@ version: 0.2
 phases:
   install:
     runtime-versions:
-      java: corretto8  # ✅ Java 8 for compatibility with AGP 2.3.2
+      java: corretto8  # Java 8 for Android Gradle Plugin 2.3.2
     commands:
       - echo "=== Installing Gradle 3.5 ==="
       - curl -s https://services.gradle.org/distributions/gradle-3.5-bin.zip -o gradle.zip
       - unzip -q gradle.zip
       - export PATH=$PWD/gradle-3.5/bin:$PATH
 
-      - echo "=== Installing Android SDK (Build Tools 26.0.2 + Platform 22) ==="
+      - echo "=== Installing Android SDK (Platform 22 + Build Tools 26.0.2) ==="
       - export ANDROID_SDK_ROOT=$HOME/android-sdk
       - mkdir -p $ANDROID_SDK_ROOT
       - curl -s https://dl.google.com/android/repository/commandlinetools-linux-6609375_latest.zip -o cmdline-tools.zip
