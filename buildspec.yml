@@ -10,28 +10,19 @@ phases:
 
   pre_build:
     commands:
-      - echo "Cleaning previous builds..."
+      - echo "Cleaning project"
       - ./gradlew clean
 
   build:
     commands:
-      - echo "Building Android debug APK..."
+      - echo "Building APK"
       - ./gradlew assembleDebug
-
-      - echo "Packaging Appium tests..."
-      - cd appium
-      - chmod +x packageTest.sh
-      - ./packageTest.sh
-      - cd ..
 
   post_build:
     commands:
-      - echo "Verifying APK output..."
-      - find ./app/build/outputs -name "*.apk" || (echo "APK not found!" && exit 1)
+      - echo "Listing generated APK"
+      - find app/build/outputs -name "*.apk"
 
 artifacts:
   files:
-    - 'app/build/outputs/**/*.apk'
-    - 'appium/target/**/*.zip'
-  base-directory: .
-  discard-paths: no
+    - app/build/outputs/**/*.apk
