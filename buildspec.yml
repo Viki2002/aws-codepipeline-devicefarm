@@ -1,31 +1,37 @@
 version: 0.2
 
-env:
-  variables:
-    ANDROID_SDK_ROOT: "/usr/local/android-sdk"
-
 phases:
   install:
     runtime-versions:
       java: corretto11
     commands:
-      - echo "Installing Android SDK..."
-      - curl -o sdk.zip https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip
-      - unzip sdk.zip -d $ANDROID_SDK_ROOT
-      - mkdir -p $ANDROID_SDK_ROOT/cmdline-tools/latest
-      - mv $ANDROID_SDK_ROOT/cmdline-tools/* $ANDROID_SDK_ROOT/cmdline-tools/latest
-      - yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses
-      - $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;30.0.3"
+      - echo "Installing dependencies"
+      - chmod +x ./gradlew
+
+  pre_build:
+    commands:
+      - echo "Cleaning previous builds..."
+      - ./gradlew clean
 
   build:
     commands:
-      - chmod +x ./gradlew
+      - echo "Building Android debug APK..."
       - ./gradlew assembleDebug
+
+      - echo "Packaging Appium tests..."
       - cd appium
+      - chmod +x packageTest.sh
       - ./packageTest.sh
+      - cd ..
+
+  post_build:
+    commands:
+      - echo "Verifying APK output..."
+      - find ./app/build/outputs -name "*.apk" || (echo "APK not found!" && exit 1)
 
 artifacts:
   files:
-    - './app/build/outputs/**/*.apk'
-    - './appium/target/**/*.zip'
-  discard-paths: yes
+    - 'app/build/outputs/**/*.apk'
+    - 'appium/target/**/*.zip'
+  base-directory: .
+  discard-paths: no
