@@ -2,21 +2,19 @@ version: 0.2
 
 env:
   variables:
-    GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx2g"
+    GRADLE_OPTS: "-Dorg.gradle.daemon=false"
     _JAVA_OPTIONS: "-Xmx2g"
 
 phases:
   install:
     runtime-versions:
-      java: corretto11
+      java: corretto17
     commands:
-      - set -e
       - echo "=== Installing Gradle 7.6.1 ==="
-      - |
-        curl -fsSL https://services.gradle.org/distributions/gradle-7.6.1-bin.zip -o gradle.zip
-        unzip -q gradle.zip
-        export PATH="$PWD/gradle-7.6.1/bin:$PATH"
-        gradle --version
+      - curl -fsSL https://services.gradle.org/distributions/gradle-7.6.1-bin.zip -o gradle.zip
+      - unzip -q gradle.zip
+      - export PATH="$PWD/gradle-7.6.1/bin:$PATH"
+      - gradle --version
 
       - echo "=== Installing Android SDK CLI tools ==="
       - export ANDROID_SDK_ROOT="$HOME/android-sdk"
@@ -28,7 +26,7 @@ phases:
       - chmod +x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
       - sdkmanager --version || { echo "❌ sdkmanager missing"; exit 1; }
 
-      - echo "=== Accepting licenses and installing SDK packages ==="
+      - echo "=== Accepting licenses and installing build tools ==="
       - yes | sdkmanager --licenses >/dev/null
       - sdkmanager "platform-tools" "platforms;android-29" "build-tools;33.0.2"
 
@@ -41,12 +39,12 @@ phases:
 
   build:
     commands:
-      - echo "=== Gradle assemble ==="
+      - echo "=== Gradle build ==="
       - ./gradlew assembleDebug assembleAndroidTest --stacktrace --info
 
   post_build:
     commands:
-      - echo "=== APKs generated ==="
+      - echo "=== APKs Generated ==="
       - find app/build/outputs -name "*.apk" -print
       - |
         if [ $(find app/build/outputs -name "*.apk" | wc -l) -eq 0 ]; then
