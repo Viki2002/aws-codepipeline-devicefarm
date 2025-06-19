@@ -3,18 +3,21 @@ version: 0.2
 phases:
   install:
     runtime-versions:
-      java: corretto11
+      java: corretto8  # ✅ Java 8 for compatibility with AGP 2.3.2
     commands:
-      - echo "=== Installing Android SDK and tools ==="
+      - echo "=== Installing Gradle 3.5 ==="
+      - curl -s https://services.gradle.org/distributions/gradle-3.5-bin.zip -o gradle.zip
+      - unzip -q gradle.zip
+      - export PATH=$PWD/gradle-3.5/bin:$PATH
+
+      - echo "=== Installing Android SDK (Build Tools 26.0.2 + Platform 22) ==="
       - export ANDROID_SDK_ROOT=$HOME/android-sdk
       - mkdir -p $ANDROID_SDK_ROOT
-      - curl -s https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -o cmdline-tools.zip
-      - unzip -q cmdline-tools.zip -d $ANDROID_SDK_ROOT/cmdline-tools-temp
-      - mkdir -p $ANDROID_SDK_ROOT/cmdline-tools/latest
-      - mv $ANDROID_SDK_ROOT/cmdline-tools-temp/cmdline-tools/* $ANDROID_SDK_ROOT/cmdline-tools/latest/
-      - export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
+      - curl -s https://dl.google.com/android/repository/commandlinetools-linux-6609375_latest.zip -o cmdline-tools.zip
+      - unzip -q cmdline-tools.zip -d $ANDROID_SDK_ROOT/cmdline-tools
+      - export PATH=$ANDROID_SDK_ROOT/cmdline-tools/tools/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
       - yes | sdkmanager --licenses || true
-      - sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+      - sdkmanager "platform-tools" "platforms;android-22" "build-tools;26.0.2"
       - echo "=== Android SDK setup complete ==="
       - chmod +x ./gradlew
 
