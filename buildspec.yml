@@ -11,12 +11,12 @@ phases:
   pre_build:
     commands:
       - echo "Cleaning project"
-      - ./gradlew clean
+      - ./gradlew clean --stacktrace --info
 
   build:
     commands:
       - echo "Building APK"
-      - ./gradlew assembleDebug
+      - ./gradlew assembleDebug --stacktrace --info
 
   post_build:
     commands:
