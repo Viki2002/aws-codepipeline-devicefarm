@@ -28,9 +28,10 @@ phases:
       - export ANDROID_SDK_ROOT="$HOME/android-sdk"
       - mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
       - curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-6609375_latest.zip -o cmdline-tools.zip
-      - unzip -q cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
+      - unzip -q cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools/tmp"
       - mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-      - mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools"/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/"
+      - mv "$ANDROID_SDK_ROOT/cmdline-tools/tmp"/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/"
+      - rm -rf "$ANDROID_SDK_ROOT/cmdline-tools/tmp"
       - export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
       - sdkmanager --version || { echo "❌ sdkmanager missing"; exit 1; }
       - yes | sdkmanager --licenses >/dev/null
@@ -40,12 +41,12 @@ phases:
 
   pre_build:
     commands:
-      - echo "=== Cleaning project with Gradle ==="
+      - echo "=== Gradle clean ==="
       - ./gradlew clean --stacktrace --info
 
   build:
     commands:
-      - echo "=== Building APKs ==="
+      - echo "=== Gradle assemble ==="
       - ./gradlew assembleDebug assembleAndroidTest --stacktrace --info
 
   post_build:
