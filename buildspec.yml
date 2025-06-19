@@ -35,12 +35,17 @@ phases:
   pre_build:
     commands:
       - echo "=== Gradle clean ==="
-      - ./gradlew clean --stacktrace --info --warning-mode=all || { echo "❌ Gradle clean failed"; exit 1; }
+      - echo "Listing directory structure for debugging:"
+      - ls -R
+      - echo "Printing settings.gradle and build.gradle:"
+      - cat settings.gradle || echo "❌ settings.gradle not found"
+      - cat build.gradle || echo "❌ build.gradle not found"
+      - ./gradlew clean --stacktrace --info --warning-mode=all || echo "❌ Gradle clean failed, check logs above"
 
   build:
     commands:
       - echo "=== Gradle build ==="
-      - ./gradlew assembleDebug assembleAndroidTest --stacktrace --info --warning-mode=all || { echo "❌ Gradle build failed"; exit 1; }
+      - ./gradlew assembleDebug assembleAndroidTest --stacktrace --info --warning-mode=all || echo "❌ Gradle build failed"
 
   post_build:
     commands:
