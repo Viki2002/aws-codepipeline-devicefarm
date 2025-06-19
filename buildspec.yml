@@ -35,20 +35,17 @@ phases:
   pre_build:
     commands:
       - echo "=== Gradle clean ==="
-      - echo "Listing directory structure for debugging:"
-      - ls -R
-      - echo "Printing settings.gradle and build.gradle:"
-      - cat settings.gradle || echo "❌ settings.gradle not found"
-      - cat build.gradle || echo "❌ build.gradle not found"
-      - ./gradlew clean --stacktrace --info --warning-mode=all || echo "❌ Gradle clean failed, check logs above"
+      - ./gradlew clean --stacktrace --info --warning-mode=all
 
   build:
     commands:
       - echo "=== Gradle build ==="
-      - ./gradlew assembleDebug assembleAndroidTest --stacktrace --info --warning-mode=all || echo "❌ Gradle build failed"
+      - ./gradlew assembleDebug assembleAndroidTest --stacktrace --info --warning-mode=all
 
   post_build:
     commands:
+      - echo "=== Listing files for debug ==="
+      - ls -R app/build || echo "❌ app/build directory missing"
       - echo "=== APKs Generated ==="
       - find app/build/outputs -name "*.apk" -print
       - |
