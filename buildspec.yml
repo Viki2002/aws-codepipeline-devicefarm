@@ -4,12 +4,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: Mobile App CICD Demo
 
 Parameters:
-  DeviceFarmProjectName:
-    Type: String
-    Default: demo-app-devicefarm
-  SourceBranchName:
-    Type: String
-    Default: master
   GitHubBranchName:
     Type: String
     Default: main
@@ -27,52 +21,6 @@ Parameters:
     Default: app.apk
 
 Resources:
-  LambdaRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Sid: ''
-          Effect: Allow
-          Principal:
-            Service:
-            - lambda.amazonaws.com
-          Action: sts:AssumeRole
-      Path: "/"
-      Policies:
-      - PolicyName: LambdaPolicy
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Action: "devicefarm:*"
-            Resource: "*"
-            Effect: Allow
-          - Action: "logs:*"
-            Resource: "*"
-            Effect: Allow
-          - Action: "codepipeline:PutJob*"
-            Resource: "*"
-            Effect: Allow
-
-  DeviceFarmProjectFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      Description: "Creates, updates, deletes Device Farm projects"
-      Handler: "index.handler"
-      Runtime: "python3.6"
-      Role: !GetAtt LambdaRole.Arn
-      Code:
-        ZipFile: |
-          # [Python function code omitted for brevity]
-          pass
-
-  DeviceFarmProject:
-    Type: Custom::DeviceFarmProject
-    Properties:
-      ServiceToken: !GetAtt DeviceFarmProjectFunction.Arn
-      ProjectName: !Ref DeviceFarmProjectName
-
   PipelineBucket:
     Type: AWS::S3::Bucket
 
@@ -189,27 +137,6 @@ Resources:
             Action:
             - codebuild:*
             Resource: "*"
-          - Effect: Allow
-            Action:
-            - lambda:InvokeFunction
-            Resource: "*"
-
-  StartDeviceFarmTestFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      Handler: index.handler
-      MemorySize: 128
-      Role: !GetAtt LambdaRole.Arn
-      Runtime: python3.6
-      Timeout: 300
-      Environment:
-        Variables:
-          PROJECT_ARN: !GetAtt DeviceFarmProject.Arn
-          DEVICE_POOL_ARN: !GetAtt DeviceFarmProject.DevicePoolArn
-      Code:
-        ZipFile: !Sub |
-          # [Python function code omitted for brevity]
-          pass
 
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -250,21 +177,6 @@ Resources:
           Configuration:
             ProjectName: !Ref Builder
           RunOrder: 1
-      - Name: Test
-        Actions:
-        - Name: RunDeviceFarmTest
-          InputArtifacts:
-          - Name: buildArtifact
-          ActionTypeId:
-            Category: Invoke
-            Owner: AWS
-            Version: '1'
-            Provider: Lambda
-          OutputArtifacts:
-          - Name: testRunId
-          Configuration:
-            FunctionName: !Ref StartDeviceFarmTestFunction
-          RunOrder: 1
       - Name: Deliver
         Actions:
         - Name: CopyApkToS3
@@ -281,5 +193,5 @@ Resources:
 
 Outputs:
   OutputApkUrl:
-    Description: "URL to the latest built and tested APK"
+    Description: "URL to the latest built APK"
     Value: !Sub 'https://${ArtifactBucket}.s3.amazonaws.com/${OutputApkKeyName}'
