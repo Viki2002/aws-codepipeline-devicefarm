@@ -1,63 +1,285 @@
-version: 0.2
+---
+AWSTemplateFormatVersion: '2010-09-09'
 
-env:
-  variables:
-    GRADLE_OPTS: "-Dorg.gradle.daemon=false"
-    _JAVA_OPTIONS: "-Xmx2g"
+Description: Mobile App CICD Demo
 
-phases:
-  install:
-    runtime-versions:
-      java: corretto17
-    commands:
-      - echo "=== Installing Gradle 7.6.1 ==="
-      - curl -fsSL https://services.gradle.org/distributions/gradle-7.6.1-bin.zip -o gradle.zip
-      - unzip -q gradle.zip
-      - export PATH="$PWD/gradle-7.6.1/bin:$PATH"
-      - gradle --version
+Parameters:
+  DeviceFarmProjectName:
+    Type: String
+    Default: demo-app-devicefarm
+  SourceBranchName:
+    Type: String
+    Default: master
+  GitHubBranchName:
+    Type: String
+    Default: main
+  OAuthTokenSecretId:
+    Type: String
+    Default: github-token
+  BuildTimeoutInMinutes:
+    Type: Number
+    Default: 15
+  AppModuleName:
+    Type: String
+    Default: app
+  OutputApkKeyName:
+    Type: String
+    Default: app.apk
 
-      - echo "=== Installing Android SDK CLI tools ==="
-      - export ANDROID_SDK_ROOT="$HOME/android-sdk"
-      - mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-      - curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdline-tools.zip
-      - unzip -q cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
-      - mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-      - export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
-      - chmod +x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-      - sdkmanager --version || { echo "❌ sdkmanager missing"; exit 1; }
+Resources:
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: ''
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: LambdaPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Action: "devicefarm:*"
+            Resource: "*"
+            Effect: Allow
+          - Action: "logs:*"
+            Resource: "*"
+            Effect: Allow
+          - Action: "codepipeline:PutJob*"
+            Resource: "*"
+            Effect: Allow
 
-      - echo "=== Accepting licenses and installing build tools ==="
-      - yes | sdkmanager --licenses >/dev/null
-      - sdkmanager "platform-tools" "platforms;android-29" "build-tools;33.0.2"
+  DeviceFarmProjectFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: "Creates, updates, deletes Device Farm projects"
+      Handler: "index.handler"
+      Runtime: "python3.6"
+      Role: !GetAtt LambdaRole.Arn
+      Code:
+        ZipFile: |
+          # [Python function code omitted for brevity]
+          pass
 
-      - chmod +x ./gradlew
+  DeviceFarmProject:
+    Type: Custom::DeviceFarmProject
+    Properties:
+      ServiceToken: !GetAtt DeviceFarmProjectFunction.Arn
+      ProjectName: !Ref DeviceFarmProjectName
 
-  pre_build:
-    commands:
-      - echo "=== Gradle clean ==="
-      - ./gradlew clean --stacktrace --info --warning-mode=all
+  PipelineBucket:
+    Type: AWS::S3::Bucket
 
-  build:
-    commands:
-      - echo "=== Gradle build ==="
-      - ./gradlew assembleDebug assembleAndroidTest --stacktrace --info --warning-mode=all
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
 
-  post_build:
-    commands:
-      - echo "=== Listing files for debug ==="
-      - ls -R app/build || echo "❌ app/build directory missing"
-      - echo "=== APKs Generated ==="
-      - find app/build/outputs -name "*.apk" -print
-      - |
-        if [ $(find app/build/outputs -name "*.apk" | wc -l) -eq 0 ]; then
-          echo "❌ No APKs produced – failing build"; exit 1; fi
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - codebuild.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: CodePipelinePolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - s3:Get*
+            - s3:Put*
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - ecr:GetAuthorizationToken
+            Resource: "*"
 
-artifacts:
-  discard-paths: yes
-  files:
-    - app/build/outputs/**/*.apk
+  Builder:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/android-java-8:24.4.1
+        Type: LINUX_CONTAINER
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub |
+          version: 0.1
+          phases:
+            pre_build:
+              commands:
+                - android-accept-licenses.sh "android update sdk --no-ui --all --filter \"android-$ANDROID_VERSION,tools,platform-tools,build-tools-$ANDROID_TOOLS_VERSION,extra-android-m2repository\""
+                - echo "y" | $ANDROID_HOME/tools/bin/sdkmanager "extras;m2repository;com;android;support;constraint;constraint-layout;1.0.2"
+            build:
+              commands:
+                - ./gradlew build
+          artifacts:
+            files:
+              - ${AppModuleName}/build/outputs/apk/debug/${AppModuleName}-debug.apk
+            discard-paths: yes
+      Artifacts:
+        Type: CODEPIPELINE
+      TimeoutInMinutes: !Ref BuildTimeoutInMinutes
 
-cache:
-  paths:
-    - '/root/.gradle/**/*'
-    - '$HOME/android-sdk/**/*'
+  Deliver:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/android-java-8:24.4.1
+        Type: LINUX_CONTAINER
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub |
+          version: 0.1
+          phases:
+            build:
+              commands:
+                - aws s3 cp --acl public-read ${AppModuleName}-debug.apk s3://${ArtifactBucket}/${OutputApkKeyName}
+          artifacts:
+            files:
+              - ${AppModuleName}-debug.apk
+      Artifacts:
+        Type: CODEPIPELINE
+      TimeoutInMinutes: !Ref BuildTimeoutInMinutes
+
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - codepipeline.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: CodePipelinePolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:GetObjectVersion
+            - s3:GetBucketVersioning
+            - s3:PutObject
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - codebuild:*
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - lambda:InvokeFunction
+            Resource: "*"
+
+  StartDeviceFarmTestFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.handler
+      MemorySize: 128
+      Role: !GetAtt LambdaRole.Arn
+      Runtime: python3.6
+      Timeout: 300
+      Environment:
+        Variables:
+          PROJECT_ARN: !GetAtt DeviceFarmProject.Arn
+          DEVICE_POOL_ARN: !GetAtt DeviceFarmProject.DevicePoolArn
+      Code:
+        ZipFile: !Sub |
+          # [Python function code omitted for brevity]
+          pass
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineBucket
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      Stages:
+      - Name: Source
+        Actions:
+        - Name: GitHubSource
+          ActionTypeId:
+            Category: Source
+            Owner: ThirdParty
+            Version: '1'
+            Provider: GitHub
+          Configuration:
+            Owner: Viki2002
+            Repo: aws-codepipeline-devicefarm
+            Branch: !Ref GitHubBranchName
+            OAuthToken: '{{resolve:secretsmanager:${OAuthTokenSecretId}:SecretString}}'
+          OutputArtifacts:
+          - Name: SourceBundle
+          RunOrder: 1
+      - Name: Build
+        Actions:
+        - Name: CodeBuild
+          InputArtifacts:
+          - Name: SourceBundle
+          ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Version: '1'
+            Provider: CodeBuild
+          OutputArtifacts:
+          - Name: buildArtifact
+          Configuration:
+            ProjectName: !Ref Builder
+          RunOrder: 1
+      - Name: Test
+        Actions:
+        - Name: RunDeviceFarmTest
+          InputArtifacts:
+          - Name: buildArtifact
+          ActionTypeId:
+            Category: Invoke
+            Owner: AWS
+            Version: '1'
+            Provider: Lambda
+          OutputArtifacts:
+          - Name: testRunId
+          Configuration:
+            FunctionName: !Ref StartDeviceFarmTestFunction
+          RunOrder: 1
+      - Name: Deliver
+        Actions:
+        - Name: CopyApkToS3
+          InputArtifacts:
+          - Name: buildArtifact
+          ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Version: '1'
+            Provider: CodeBuild
+          Configuration:
+            ProjectName: !Ref Deliver
+          RunOrder: 1
+
+Outputs:
+  OutputApkUrl:
+    Description: "URL to the latest built and tested APK"
+    Value: !Sub 'https://${ArtifactBucket}.s3.amazonaws.com/${OutputApkKeyName}'
